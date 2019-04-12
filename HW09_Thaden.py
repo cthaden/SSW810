@@ -7,6 +7,7 @@ Created April 2019
 """
 
 import os
+import sys
 from collections import defaultdict
 from prettytable import PrettyTable
 
@@ -46,15 +47,42 @@ class Student:
         self.name = name
         self.major = major
         self.grades = defaultdict(str)
+        self.completed_courses = set()
+        self.courses_to_complete = set()
+        self.electives = set()
 
     def add_course_grade(self, course="", final_grade=""):
         """ function to add a final grade for a course in student class
         """
         self.grades[course] = final_grade
+        if final_grade in ["A", "A-", "B+", "B", "B-", "C+", "C"]:
+            self.completed_courses.add(course)
+
+    def courses_required_add(self, course=""):
+        """ add course to courses to complete if not already passed
+        """
+        if course not in self.completed_courses:
+            self.courses_to_complete.add(course)
+
+    def courses_elective_add(self, course=""):
+        """ add course to courses to complete if not already passed
+        """
+        self.electives.add(course)
 
     def array_format(self):
         """ returns array that can be used for prettytable"""
-        return[self.cwid, self.name, sorted(self.grades)]
+        elective_taken = False
+        for courses in self.completed_courses:
+            if courses in self.electives:
+                elective_taken = True
+                break
+        if elective_taken is True:
+            elective_left = "None"
+        else:
+            elective_left = sorted(self.electives)
+        return[self.cwid, self.name, self.major,
+               sorted(self.completed_courses),
+               sorted(self.courses_to_complete), elective_left]
 
 
 class Instructor:
@@ -83,15 +111,41 @@ class Instructor:
                    self.courses[course]]
 
 
+class Major:
+    """ Major class
+    """
+    def __init__(self, official_major=""):
+        """ major has a name, required courses, and elective
+            courses
+        """
+        self.major = official_major
+        self.required = set()
+        self.elective = set()
+
+    def courses_required_elective(self, course="", flag=""):
+        """ separates required courses into a list and
+            elective courses into a list
+        """
+        if flag == "R":
+            self.required.add(course)
+        elif flag == "E":
+            self.elective.add(course)
+
+    def array_format(self):
+        """ returns array that can be used for prettytable"""
+        return[self.major, sorted(self.required), sorted(self.elective)]
+
+
 class University:
     """ University class holds all data for a specific organization
     """
     def __init__(self, dir_path):
-        """ repository has a directory path that points to where to find
+        """ university has a directory path that points to where to find
         the following files: students.txt, instructors.txt, grades.txt
         """
         self.students = {}
         self.instructors = {}
+        self.majors = {}
         self.dir_path = dir_path
 
     def student_process(self, file):
@@ -99,11 +153,9 @@ class University:
         """
         path = os.path.join(self.dir_path, file)
         try:
-            for s_details in file_reader(path, 3, separator="\t"):
-                self.students[s_details[0]] = Student(cwid=s_details[0],
-                                                      name=s_details[1],
-                                                      major=s_details[2])
-        except:
+            for cwid, name, major in file_reader(path, 3, separator="\t"):
+                self.students[cwid] = Student(cwid, name, major)
+        except FileNotFoundError:
             print('Warning: Something went wrong processing the students.txt')
 
     def instructor_process(self, file):
@@ -111,11 +163,9 @@ class University:
         """
         path = os.path.join(self.dir_path, file)
         try:
-            for i_details in file_reader(path, 3, separator="\t"):
-                self.instructors[i_details[0]] = Instructor(cwid=i_details[0],
-                                                            name=i_details[1],
-                                                            dept=i_details[2])
-        except:
+            for cwid, name, dept in file_reader(path, 3, separator="\t"):
+                self.instructors[cwid] = Instructor(cwid, name, dept)
+        except FileNotFoundError:
             print('Warning: Something went wrong processing the \
                    instructors.txt')
 
@@ -133,13 +183,36 @@ class University:
                 if g_details[3] in self.instructors.keys():
                     self.instructors[g_details[3]].add_course_student(
                                                    course=g_details[1])
-        except:
+        except FileNotFoundError:
             print('Warning: Something went wrong processing the grades.txt')
+
+    def major_process(self, file):
+        """ processes major information from file
+        """
+        path = os.path.join(self.dir_path, file)
+        try:
+            for official_major, flag, course in file_reader(path, 3,
+                                                            separator="\t"):
+                for s in self.students.keys():
+                    if self.students[s].major == official_major:
+                        if flag is "R":
+                            self.students[s].courses_required_add(course)
+                        elif flag is "E":
+                            self.students[s].courses_elective_add(course)
+                if official_major not in self.majors.keys():
+                    self.majors[official_major] = Major(official_major)
+                self.majors[official_major].courses_required_elective(course,
+                                                                      flag)
+        except FileNotFoundError:
+            print('Warning: Something went wrong processing the majors.txt')
 
     def student_prettytable(self):
         """ This prints the prettytable for students
         """
-        pt = PrettyTable(field_names=['CWID', 'Name', 'Completed Courses'])
+        pt = PrettyTable(field_names=['CWID', 'Name', 'Major',
+                                      'Completed Courses',
+                                      'Remaining Required',
+                                      'Remaining Electives'])
         for s in self.students.keys():
             pt.add_row(self.students[s].array_format())
         return pt
@@ -154,6 +227,13 @@ class University:
                 pt.add_row(c)
         return pt
 
+    def major_prettytable(self):
+        """ This prints the prettytable for majors
+        """
+        pt = PrettyTable(field_names=['Dept', 'Required', 'Electives'])
+        for major in self.majors.keys():
+            pt.add_row(self.majors[major].array_format())
+        return pt
 
 if __name__ == '__main__':
     """ print students and print instructors
@@ -162,5 +242,7 @@ if __name__ == '__main__':
     uni.student_process('students.txt')
     uni.instructor_process('instructors.txt')
     uni.grade_process('grades.txt')
+    uni.major_process('majors.txt')
+    print(uni.major_prettytable())
     print(uni.student_prettytable())
     print(uni.instructor_prettytable())

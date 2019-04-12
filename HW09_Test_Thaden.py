@@ -13,6 +13,7 @@ import unittest
 from HW09_Thaden import Student
 from HW09_Thaden import Instructor
 from HW09_Thaden import University
+from HW09_Thaden import Major
 from prettytable import PrettyTable
 
 
@@ -26,14 +27,15 @@ class HW09Test(unittest.TestCase):
         self.assertEqual(s1.name, "Kelly, P")
         self.assertEqual(s1.major, "SSW")
         self.assertEqual(s1.grades, {})
-        self.assertEqual(s1.array_format(), [11658, "Kelly, P", []])
+        self.assertEqual(s1.array_format(), [11658, "Kelly, P", "SSW", 
+                                             [], [], []])
         s1.add_course_grade(course="SSW-555", final_grade="A")
         self.assertEqual(s1.grades, {"SSW-555": "A"})
-        s1.add_course_grade(course="SSW-565", final_grade="")
-        self.assertEqual(s1.grades, ({"SSW-555": "A", "SSW-565": ""}))
+        s1.add_course_grade(course="SSW-565", final_grade="F")
+        self.assertEqual(s1.grades, ({"SSW-555": "A", "SSW-565": "F"}))
         self.assertEqual(s1.array_format(), 
-                         [11658, "Kelly, P", ["SSW-555", "SSW-565"]])
-    
+                         [11658, "Kelly, P", "SSW", ["SSW-555"], [], []])
+
     def test_instructors(self):
         I1 = Instructor(cwid=98765, name="Einstein, A", dept="SFEN")
         self.assertEqual(I1.cwid, 98765)
@@ -46,7 +48,15 @@ class HW09Test(unittest.TestCase):
         self.assertEqual(I1.courses, {"SSW-540": 2})
         I1.add_course_student(course="SSW-567")
         self.assertEqual(I1.courses, {"SSW-540": 2, "SSW-567": 1})
-  
+
+    def test_majors(self):
+        M1 = Major(official_major="SSW")
+        self.assertEqual(M1.major, "SSW")
+        M1.courses_required_elective(course="810", flag="E")
+        M1.courses_required_elective(course="555", flag="R")
+        self.assertEqual(M1.required, {"555"})
+        self.assertEqual(M1.elective, {"810"})
+
     def test_university(self):
         uni = University("")
         self.assertEqual(uni.students, {})
