@@ -10,6 +10,7 @@ import os
 import sys
 from collections import defaultdict
 from prettytable import PrettyTable
+import sqlite3
 
 
 def file_reader(dir, n, separator=",", is_header=False):
@@ -146,36 +147,44 @@ class University:
         self.students = {}
         self.instructors = {}
         self.majors = {}
-        self.dir_path = dir_path
+        if dir_path != "":
+            self.load_from_path(dir_path)
 
-    def student_process(self, file):
-        """ processes student information from file
+    def student_process(self):
+        """ processes student information from database
         """
-        path = os.path.join(self.dir_path, file)
         try:
-            for cwid, name, major in file_reader(path, 3, separator="\t"):
+            students = self._db.execute("select CWID, NAME, MAJOR from \
+                                         STUDENTS")
+        except sqlite3.OperationalError:
+            print("Unable to load the students data from the database.")
+        else:
+            for cwid, name, major in students:
                 self.students[cwid] = Student(cwid, name, major)
-        except FileNotFoundError:
-            print('Warning: Something went wrong processing the students.txt')
 
-    def instructor_process(self, file):
-        """ processes instructor information from file
+    def instructor_process(self):
+        """ processes instructor information from database
         """
-        path = os.path.join(self.dir_path, file)
         try:
-            for cwid, name, dept in file_reader(path, 3, separator="\t"):
+            instructors = self._db.execute("select CWID, NAME, DEPT from \
+                                            INSTRUCTORS")
+        except sqlite3.OperationalError:
+            print("Unable to load the instructors data from the database.")
+        else:
+            for cwid, name, dept in instructors:
                 self.instructors[cwid] = Instructor(cwid, name, dept)
-        except FileNotFoundError:
-            print('Warning: Something went wrong processing the \
-                   instructors.txt')
 
-    def grade_process(self, file):
-        """ processes grade information for file, adds to student info,
+    def grade_process(self):
+        """ processes grade information from database, adds to student info,
         adds an additional person to instructor's course count
         """
-        path = os.path.join(self.dir_path, file)
         try:
-            for g_details in file_reader(path, 4, separator="\t"):
+            grades = self._db.execute("select STUDENT_CWID, COURSE, GRADE, \
+                                       INSTRUCTOR_CWID from GRADES")
+        except sqlite3.OperationalError:
+            print("Unable to load the grades data from the database.")
+        else:
+            for g_details in grades:
                 if g_details[0] in self.students.keys():
                     self.students[g_details[0]].add_course_grade(
                                                     course=g_details[1],
@@ -183,39 +192,37 @@ class University:
                 if g_details[3] in self.instructors.keys():
                     self.instructors[g_details[3]].add_course_student(
                                                    course=g_details[1])
-        except FileNotFoundError:
-            print('Warning: Something went wrong processing the grades.txt')
 
-    def major_process(self, file):
-        """ processes major information from file
+    def major_process(self):
+        """ processes major information from database
         """
-        path = os.path.join(self.dir_path, file)
         try:
-            for official_major, flag, course in file_reader(path, 3,
-                                                            separator="\t"):
-                for s in self.students.keys():
-                    if self.students[s].major == official_major:
-                        if flag is "R":
-                            self.students[s].courses_required_add(course)
-                        elif flag is "E":
-                            self.students[s].courses_elective_add(course)
-                if official_major not in self.majors.keys():
-                    self.majors[official_major] = Major(official_major)
-                self.majors[official_major].courses_required_elective(course,
-                                                                      flag)
-        except FileNotFoundError:
-            print('Warning: Something went wrong processing the majors.txt')
+            majors = self._db.execute("select MAJOR, COURSE from MAJORS")
+        except sqlite3.OperationalError:
+            print("Unable to load the majors data from the database.")
+#        else:
+#            for official_major, course in majors:
+#                for s in self.students.keys():
+#                    if self.students[s].major == official_major:
+#                        if flag is "R":
+#                            self.students[s].courses_required_add(course)
+#                        elif flag is "E":
+#                            self.students[s].courses_elective_add(course)
+#                if official_major not in self.majors.keys():
+#                    self.majors[official_major] = Major(official_major)
+#                self.majors[official_major].courses_required_elective(course,
+#                                                                      flag)
 
-    def student_prettytable(self):
-        """ This prints the prettytable for students
-        """
-        pt = PrettyTable(field_names=['CWID', 'Name', 'Major',
-                                      'Completed Courses',
-                                      'Remaining Required',
-                                      'Remaining Electives'])
-        for s in self.students.keys():
-            pt.add_row(self.students[s].array_format())
-        return pt
+#    def student_prettytable(self):
+#        """ This prints the prettytable for students
+#        """
+#        pt = PrettyTable(field_names=['CWID', 'Name', 'Major',
+#                                      'Completed Courses',
+#                                      'Remaining Required',
+#                                      'Remaining Electives'])
+#        for s in self.students.keys():
+#            pt.add_row(self.students[s].array_format())
+#        return pt
 
     def instructor_prettytable(self):
         """ This prints the prettytable for instructors
@@ -234,15 +241,20 @@ class University:
         for major in self.majors.keys():
             pt.add_row(self.majors[major].array_format())
         return pt
+    
+    def load_from_path(self, dir_path):
+        """ load all necessary files
+        """
+        db_path = os.path.join(dir_path, "810_startup.db")
+        self._db = sqlite3.connect(db_path)
+#       self.student_process()
+        self.instructor_process()
+        self.grade_process()
+#        self.majors_process()
+
 
 if __name__ == '__main__':
     """ print students and print instructors
     """
-    uni = University(dir_path='/Users/courtneythaden/Desktop/ssw_810')
-    uni.student_process('students.txt')
-    uni.instructor_process('instructors.txt')
-    uni.grade_process('grades.txt')
-    uni.major_process('majors.txt')
-    print(uni.major_prettytable())
-    print(uni.student_prettytable())
+    uni = University(dir_path="/Users/courtneythaden/Desktop/ssw_810/hw")
     print(uni.instructor_prettytable())

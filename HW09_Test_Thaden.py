@@ -58,22 +58,18 @@ class HW09Test(unittest.TestCase):
         self.assertEqual(M1.elective, {"810"})
 
     def test_university(self):
-        uni = University("")
-        self.assertEqual(uni.students, {})
-        self.assertEqual(uni.instructors, {})
-        uni.dir_path = "/Users/courtneythaden/Desktop/ssw_810"
-        self.assertEqual(uni.dir_path, "/Users/courtneythaden/Desktop/ssw_810")
-        uni.student_process("students.txt")
+        uni = University(dir_path="/Users/courtneythaden/Desktop/ssw_810/hw")
+        uni.student_process()
         self.assertEqual(uni.students["11658"].cwid, "11658")
         self.assertEqual(uni.students["11658"].name, "Kelly, P")
         self.assertEqual(uni.students["11658"].major, "SYEN")
         self.assertEqual(uni.students["11658"].grades, {})
-        uni.instructor_process("instructors.txt")
+        uni.instructor_process()
         self.assertEqual(uni.instructors["98765"].cwid, "98765")
         self.assertEqual(uni.instructors["98765"].name, "Einstein, A")
         self.assertEqual(uni.instructors["98765"].dept, "SFEN")
         self.assertEqual(uni.instructors["98765"].courses, {})
-        uni.grade_process("grades.txt")
+        uni.grade_process()
         self.assertEqual(uni.students["11658"].grades, {"SSW 540": "F"})
         self.assertEqual(uni.instructors["98765"].courses, {"SSW 567": 4, 
                                                             "SSW 540": 3})
